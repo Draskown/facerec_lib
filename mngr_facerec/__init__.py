@@ -32,7 +32,7 @@ class FaceRecognizer():
                  scale: int = 5,
                  ) -> None:
         # Id of the detected employee
-        self.__userID = 0
+        self.__userID = "-2"
         # Assign the passed image folder to the class instance
         self.__img_folder_name = folder_name
         # Empty dict for labels
@@ -51,6 +51,10 @@ class FaceRecognizer():
         self.__noone_count = 0
         self.__unknown_count = 0
 
+        # Load data from the json file
+        with open(self.__json_location) as f:
+            self.__json_data = json.load(f)
+
         # Load the images folder
         err = self.__load_dir()
         if err:
@@ -59,25 +63,6 @@ class FaceRecognizer():
 
         # Create the dict of labels from the provided folder
         self.__load_labels()
-
-    def get_user_id(self) -> int:
-        """
-        Returns the found face on the videoflow
-        """
-
-        return self.__userID
-
-    def update_users(self) -> None:
-        """
-        Updates the encodings of all the known images
-        and generates new if were added
-        """
-
-        # Create the dict of labels from the provided folder
-        self.__load_labels()
-
-        # Create new encodings
-        self.__encode_known_faces()
 
     def __load_dir(self) -> str:
         """
@@ -122,17 +107,13 @@ class FaceRecognizer():
         """
         Removes unmatched folder to .json ids
         """
-        
-        # Load data from the json file
-        with open(self.__json_location) as f:
-            data = json.load(f)
 
         # Rebase the dict only for those ids that are in the image folder
-        data = {item: val for (item, val) in data.items() if item in self.__labels}
+        self.__json_data = {item: val for (item, val) in self.__json_data.items() if item in self.__labels}
 
         # Write data to the json file
         with open(self.__json_location, "w") as f:
-            json.dump(data, f, indent=2)
+            json.dump(self.__json_data, f, indent=2)
 
     def __progress_bar(self,
                        it: list,
@@ -221,7 +202,70 @@ class FaceRecognizer():
 
         # Save the dictionary
         with self.__encodings_location.open(mode="wb") as f:
-            pickle.dumps(name_encodings, f)
+            pickle.dump(name_encodings, f)
+
+    def __recognize_one_face(self,
+                             uknown_encoding: list,
+                             loaded_encodings: dict) -> str:
+        """
+        Compares the acquired face to the known encodings
+        And returns the name of the most matched label
+
+        Args:
+        - uknown_encoding: encoding of the found face in the new image
+        - loaded_encodings: encodings of the known faces
+        """
+
+        # Compares encodings of the known faces and the new image
+        # As a array of matches containing
+        # True and False for every known encoding
+        boolean_matches = face_recognition.compare_faces(
+            loaded_encodings["encodings"], uknown_encoding
+        )
+
+        # Counts how many of the matched encodings
+        # Belong to the certain label
+        votes = Counter(
+            # Init the name of the label
+            name
+            # Iterate through every matche in the array
+            # Parallel to theirs descriptor
+            for match, name in zip(boolean_matches, loaded_encodings["names"])
+            # If the matches array has a label name
+            # Then increments the mount of matches
+            # That belong to a certain label
+            if match
+        )
+
+        # Returns the label that has got the most matches
+        if votes:
+            return votes.most_common(1)[0][0]
+
+    def get_user_id(self) -> str:
+        """
+        Returns the found face on the videoflow
+        """
+
+        return self.__userID
+
+    def get_json_data(self) -> dict:
+        """
+        Returns the data read from the json file
+        """
+
+        return self.__json_data
+
+    def update_users(self) -> None:
+        """
+        Updates the encodings of all the known images
+        and generates new if were added
+        """
+
+        # Create the dict of labels from the provided folder
+        self.__load_labels()
+
+        # Create new encodings
+        self.__encode_known_faces()
 
     def recognize_faces(self, img) -> None:
         """
@@ -282,7 +326,7 @@ class FaceRecognizer():
                     # In the frame for some time
                     if self.__unknown_count >= 5:
                         # Set the unknown user code
-                        self.__userID = -1
+                        self.__userID = "-1"
                 else:
                     # Reset the other counters
                     self.__unknown_count = 0
@@ -302,44 +346,7 @@ class FaceRecognizer():
             # In the frame for some time
             if self.__noone_count >= 10:
                 # Set the code for no faces in frame
-                self.__userID = -2
-
-    def __recognize_one_face(self,
-                             uknown_encoding: list,
-                             loaded_encodings: dict) -> str:
-        """
-        Compares the acquired face to the known encodings
-        And returns the name of the most matched label
-
-        Args:
-        - uknown_encoding: encoding of the found face in the new image
-        - loaded_encodings: encodings of the known faces
-        """
-
-        # Compares encodings of the known faces and the new image
-        # As a array of matches containing
-        # True and False for every known encoding
-        boolean_matches = face_recognition.compare_faces(
-            loaded_encodings["encodings"], uknown_encoding
-        )
-
-        # Counts how many of the matched encodings
-        # Belong to the certain label
-        votes = Counter(
-            # Init the name of the label
-            name
-            # Iterate through every matche in the array
-            # Parallel to theirs descriptor
-            for match, name in zip(boolean_matches, loaded_encodings["names"])
-            # If the matches array has a label name
-            # Then increments the mount of matches
-            # That belong to a certain label
-            if match
-        )
-
-        # Returns the label that has got the most matches
-        if votes:
-            return votes.most_common(1)[0][0]
+                self.__userID = "-2"
 
     def _debug_faces(self):
         # Open the videoflow
