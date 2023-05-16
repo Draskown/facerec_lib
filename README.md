@@ -1,5 +1,5 @@
 
-# Face recognizer for the nun robot
+# Face recognizer for the manager robot
 
 Program that does face recognition in the context of applying it to the robot assistant to greet employees of Applied Robotics company
 
