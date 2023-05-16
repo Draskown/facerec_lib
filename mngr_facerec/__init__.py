@@ -2,6 +2,7 @@ import face_recognition
 import pickle
 import cv2
 import sys
+import json
 from pathlib import Path
 from collections import Counter
 from typing import TextIO
@@ -18,13 +19,15 @@ class FaceRecognizer():
 
     Args:
     - folder_name: path to the folder containing images
+    - encodings_location: location to the .pkl file
+    - json_location: location to the .json file
     - model: the model that performs recognition ("hog"(default) or "cnn")
-    - location: location to the .pkl file for the generated encodings
     - scale: by how much the image needs to be downgraded
     """
     def __init__(self,
                  folder_name: str,
                  encodings_location: str,
+                 json_location: str,
                  model: str = "hog",
                  scale: int = 5,
                  ) -> None:
@@ -40,8 +43,9 @@ class FaceRecognizer():
         self.__encodings_location = Path(encodings_location)
         # Assign the passed image width to the class instance
         self.__scale = scale
+        # Assign the passed json location to the class instance
+        self.__json_location = json_location
         
-
         # Create counters for three situations
         self.__known_count = 0
         self.__noone_count = 0
@@ -111,6 +115,24 @@ class FaceRecognizer():
                     if label not in self.__labels:
                         self.__labels[label] = current_id
                         current_id += 1
+
+        self.__cleanup_json()
+
+    def __cleanup_json(self) -> None:
+        """
+        Removes unmatched folder to .json ids
+        """
+        
+        # Load data from the json file
+        with open(self.__json_location) as f:
+            data = json.load(f)
+
+        # Rebase the dict only for those ids that are in the image folder
+        data = {item: val for (item, val) in data.items() if item in self.__labels}
+
+        # Write data to the json file
+        with open(self.__json_location, "w") as f:
+            json.dump(data, f, indent=2)
 
     def __progress_bar(self,
                        it: list,
@@ -199,7 +221,7 @@ class FaceRecognizer():
 
         # Save the dictionary
         with self.__encodings_location.open(mode="wb") as f:
-            pickle.dump(name_encodings, f)
+            pickle.dumps(name_encodings, f)
 
     def recognize_faces(self, img) -> None:
         """
