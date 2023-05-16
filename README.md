@@ -17,6 +17,8 @@ In order to use the package you need to create a `FaceRecognizer` class instance
 - call `recognize_faces` method in order to immediately perform face recognition from the videoflow. Breaks if the encodings.pkl was altered of not generated at all. To generate the .pkl file use the following method.
 - call `update_users` method in order to update the .pkl file accodring to the folder where the images are located.
 - call `get_user_id` method in order to get the id of the user that was recognized.
+- call `get_json_data` method in order to load the data from .json file with which the system operates.
+- call `create_user` method in order to start the gathering of the images for the brand new id.
 
 ## Example
 
