@@ -264,6 +264,7 @@ class FaceRecognizer():
         else:
             self.__add_user()
             self.update_users()
+            self.__known_count = 10
 
     def __add_user(self) -> None:
         """
@@ -295,13 +296,8 @@ class FaceRecognizer():
         """
         Returns the found face on the videoflow
         """
-        if self.__userID in self.__labels:
-            return self.__userID
-        else:
-            sys.stdout.write("There is no info about that user \
-                             (it was probably added to the .pkl file previously\
-                              but was deleted from training folder)\n")
-            return "-2"
+
+        return self.__userID
 
     def get_json_data(self) -> dict:
         """
