@@ -1,12 +1,15 @@
-import face_recognition
-import pickle
 import cv2
 import sys
 import json
+import time
+import pickle
+import random
+import threading
+import face_recognition
 from pathlib import Path
 from collections import Counter
 from typing import TextIO
-from os import walk, listdir
+from os import walk, listdir, makedirs
 from os.path import basename, \
      exists, join as join_paths
 
@@ -35,8 +38,8 @@ class FaceRecognizer():
         self.__userID = "-2"
         # Assign the passed image folder to the class instance
         self.__img_folder_name = folder_name
-        # Empty dict for labels
-        self.__labels = {}
+        # Empty array for labels
+        self.__labels = []
         # Assign the passed model to the class instance
         self.__model = model
         # Assign the passed encodings location to the class instance
@@ -50,6 +53,13 @@ class FaceRecognizer():
         self.__known_count = 0
         self.__noone_count = 0
         self.__unknown_count = 0
+
+        # Initialize the mode for collecting new user
+        self.collection_mode = 0
+        # Initialize the counter for images that are taken
+        self.__taken_pictures = 0
+        # Initialize new user id
+        self.__new_user_id = None
 
         # Load data from the json file
         with open(self.__json_location) as f:
@@ -84,11 +94,11 @@ class FaceRecognizer():
 
     def __load_labels(self) -> None:
         """
-        Creates a dict for the labels provided in the folder with images
+        Fills in a list for the labels provided in the folder with images
         """
 
-        # Set the first id to zero
-        current_id = 0
+        # Reset the list of labels
+        self.__labels = []
         for root, _, files in walk(self.__images_dir):
             for file in files:
                 # Every file is being checked for being an image
@@ -98,9 +108,9 @@ class FaceRecognizer():
                     label = basename(root)
                     # If this label is not present in the dict - add it
                     if label not in self.__labels:
-                        self.__labels[label] = current_id
-                        current_id += 1
+                        self.__labels.append(label)
 
+        self.collection_mode = 0
         self.__cleanup_json()
 
     def __cleanup_json(self) -> None:
@@ -241,18 +251,62 @@ class FaceRecognizer():
         if votes:
             return votes.most_common(1)[0][0]
 
+    def __take_picture(self, img: cv2.Mat) -> None:
+        """
+        Saves one picture of the user to the folder
+        """
+        if self.__taken_pictures < 40:
+            sys.stdout.write(f"Collecting pictures {self.__taken_pictures+1}/40\n")
+            cv2.imwrite(join_paths(self.__images_dir, str(self.__new_user_id), str(self.__taken_pictures+1)+".jpg"), img)
+            self.__taken_pictures += 1
+
+            time.sleep(0.1)
+        else:
+            self.__add_user()
+            self.update_users()
+
+    def __add_user(self) -> None:
+        """
+        Adds the new user to the json file
+        """
+        self.__json_data[self.__new_user_id] = {"name": "TO SET", "tasks": "TO SET"}
+
+    def __create_user_id(self) -> None:
+        """
+        Creates a random number to be user id
+        """
+        self.__new_user_id = str(random.randrange(10**5, 10**6))
+
+        while self.__new_user_id in self.__labels:
+            self.__new_user_id = str(random.randrange(10**5, 10**6))
+
+        makedirs(join_paths(self.__images_dir, self.__new_user_id))
+
+    def __wait(self) -> None:
+        """
+        Waits for some time before the person 
+        can be asked again to take pictures of
+        """
+
+        time.sleep(10)
+        self.collection_mode = 0
+
     def get_user_id(self) -> str:
         """
         Returns the found face on the videoflow
         """
-
-        return self.__userID
+        if self.__userID in self.__labels:
+            return self.__userID
+        else:
+            sys.stdout.write("There is no info about that user \
+                             (it was probably added to the .pkl file previously\
+                              but was deleted from training folder)\n")
+            return "-2"
 
     def get_json_data(self) -> dict:
         """
         Returns the data read from the json file
         """
-
         return self.__json_data
 
     def update_users(self) -> None:
@@ -260,7 +314,6 @@ class FaceRecognizer():
         Updates the encodings of all the known images
         and generates new if were added
         """
-
         # Create the dict of labels from the provided folder
         self.__load_labels()
 
@@ -269,9 +322,14 @@ class FaceRecognizer():
 
     def recognize_faces(self, img) -> None:
         """
-        Performs the face recognition from the videocapture
+        Performs the face recognition from the image
         """
 
+        # Leave the method if the user is being taken pictures of
+        if self.collection_mode == 1:
+            return
+
+        # Leave the method if the file specified does not exist
         if not exists(self.__encodings_location):
             sys.stdout.write("Specified file for encodings is not found\n")
             return
@@ -348,6 +406,43 @@ class FaceRecognizer():
                 # Set the code for no faces in frame
                 self.__userID = "-2"
 
+    def create_user(self, img: cv2.Mat) -> None:
+        """
+        Gathers pictures from the passed images and creates a new user from them
+        """
+
+        # Leave the method if the user has chosen not to
+        # Take pictures of them
+        if self.collection_mode == 2:
+            return
+        
+        # If user has agreed to take pictures of them
+        if self.collection_mode == 1:
+            self.__take_picture(img)
+            return
+
+        # Print the message
+        sys.stdout.write("I don't know you\nCan I take some images of you (y/n)?\n")
+
+        # Wait for the answer
+        answer = input()
+
+        # Interpret the answer
+        if answer == "y":
+            # If yes - collect photos of the user
+            self.__create_user_id()
+            self.__taken_pictures = 0
+            self.collection_mode = 1
+        elif answer == "n":
+            # If no - do not collect faces of the user
+            # Until the program is restarted or
+            # Until the update_user method is called
+            self.collection_mode = 2
+            wait_thread = threading.Thread(target=self.__wait)
+            wait_thread.start()
+        else:
+            return
+    
     def _debug_faces(self):
         # Open the videoflow
         cap = cv2.VideoCapture(0)
