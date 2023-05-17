@@ -49,6 +49,9 @@ class FaceRecognizer():
         # Assign the passed json location to the class instance
         self.__json_location = json_location
         
+        # Create a CLAHE object for adaptive histogram equalization
+        self.__clh = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+
         # Create counters for three situations
         self.__known_count = 0
         self.__noone_count = 0
@@ -112,6 +115,31 @@ class FaceRecognizer():
 
         self.collection_mode = 0
         self.__cleanup_json()
+
+    def __preprocess_image(self, img: cv2.Mat) -> cv2.Mat:
+        """
+        Applies scaling, bluring and adaptive histogram qualization to the image
+        """
+        # BLur the image to reduce noise
+        img = cv2.medianBlur(img, 3)
+
+        # Resize for faster performance
+        resized_image = cv2.resize(img,
+                                    (0, 0),
+                                    fx=self.__scale/10.,
+                                    fy=self.__scale/10.)
+        
+        # Convert to black and white
+        bw_img = cv2.cvtColor(resized_image, cv2.COLOR_BGR2GRAY)
+
+        # Apply equalization
+        clh_img = self.__clh.apply(bw_img)
+
+        resized_image[:, :, 0] = clh_img
+        resized_image[:, :, 1] = clh_img
+        resized_image[:, :, 2] = clh_img
+
+        return resized_image
 
     def __cleanup_json(self) -> None:
         """
@@ -182,21 +210,16 @@ class FaceRecognizer():
                     # Load the image from image path
                     image = face_recognition.load_image_file(file_path)
 
-                    # Resizes the image for faster processing
-                    resized_image = cv2.resize(image,
-                                               (int(image.shape[1] / self.__scale),
-                                                int(image.shape[0] / self.__scale)),
-                                               interpolation=cv2.INTER_AREA,
-                                               )
-
+                    proccessed_img = self.__preprocess_image(image)
+                    
                 # Find the location of the face
                 face_locations = face_recognition.face_locations(
-                    resized_image,
+                    proccessed_img,
                     model=self.__model,
                 )
                 # Generates encoding for the found face(s)
                 face_encodings = face_recognition.face_encodings(
-                    resized_image,
+                    proccessed_img,
                     face_locations,
                 )
 
@@ -340,14 +363,11 @@ class FaceRecognizer():
             sys.stdout.write("Empty encodings.pkl file\n")
             return
 
-        small_frame = cv2.resize(img,
-                                    (0, 0),
-                                    fx=self.__scale/10.,
-                                    fy=self.__scale/10.)
+        proccessed_frame = self.__preprocess_image(img)
 
         # Finds the position of the face
         input_face_locations = face_recognition.face_locations(
-            small_frame,
+            proccessed_frame,
             model=self.__model
         )
 
@@ -355,7 +375,7 @@ class FaceRecognizer():
         if input_face_locations:
             # Generates an encoding for the detected face(s)
             input_face_encodings = face_recognition.face_encodings(
-                small_frame,
+                proccessed_frame,
                 input_face_locations,
             )
 
@@ -418,7 +438,7 @@ class FaceRecognizer():
             return
 
         # Print the message
-        sys.stdout.write("I don't know you\nCan I take some images of you (y/n)?\n")
+        sys.stdout.write("I don't know you\nCan I take some pictures of you (y/n)?\n")
 
         # Wait for the answer
         answer = input()

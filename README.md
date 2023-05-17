@@ -18,11 +18,11 @@ In order to use the package you need to create a `FaceRecognizer` class instance
 - call `update_users` method in order to update the .pkl file accodring to the folder where the images are located.
 - call `get_user_id` method in order to get the id of the user that was recognized.
 - call `get_json_data` method in order to load the data from .json file with which the system operates.
-- call `create_user` method in order to start the gathering of the images for the brand new id.
+- call `create_user` method in order to start the gathering of the images for the bran`d new id.
 
-## Example
+## Examples
 
-The file `example.py` provides an example of usage for the library.
+- The simplest example is provided in the `example.py` file.
 
 ```python
 from mngr_facerec import FaceRecognizer
@@ -54,3 +54,5 @@ if __name__ == "__main__":
     get_thread.start()
 
 ```
+
+- More advanced example with ROS2 integration you can find [here](https://github.com/Draskown/facerec_pkg)
