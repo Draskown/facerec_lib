@@ -85,11 +85,11 @@ class FaceRecognizer():
         # Check for the folder actually existing
         tmp_dir = self.__img_folder_name
         if not exists(tmp_dir):
-            return "Folder does not exist"
+            return "Error: folder does not exist"
 
         # Check for subfolders or files in the provided folder
         if len(listdir(tmp_dir)) == 0:
-            return "Folder is empty"
+            return "Error: folder is empty"
 
         # Set the image directory and return no errors
         self.__images_dir = tmp_dir
@@ -116,13 +116,20 @@ class FaceRecognizer():
         self.collection_mode = 0
         self.__cleanup_json()
 
-    def __preprocess_image(self, img: cv2.Mat) -> cv2.Mat:
+    def __preprocess_image(self,
+                           img: cv2.Mat,
+                           color_space: str = "BGR"
+                           ) -> cv2.Mat:
         """
         Applies scaling, bluring and adaptive histogram qualization to the image
+
+        Args:
+        - img: input image.
+        - color_space: original color space of the image (BGR, RGB). BGR by default.
         """
         # BLur the image to reduce noise
         img = cv2.medianBlur(img, 3)
-
+        
         # Resize for faster performance
         resized_image = cv2.resize(img,
                                     (0, 0),
@@ -130,7 +137,12 @@ class FaceRecognizer():
                                     fy=self.__scale/10.)
         
         # Convert to black and white
-        bw_img = cv2.cvtColor(resized_image, cv2.COLOR_BGR2GRAY)
+        if color_space == "BGR":
+            bw_img = cv2.cvtColor(resized_image, cv2.COLOR_BGR2GRAY)
+        elif color_space == "RGB":
+            bw_img = cv2.cvtColor(resized_image, cv2.COLOR_RGB2GRAY)
+        else:
+            sys.stdout.write("Error: wrong color space of the image\n")
 
         # Apply equalization
         clh_img = self.__clh.apply(bw_img)
@@ -277,6 +289,9 @@ class FaceRecognizer():
     def __take_picture(self, img: cv2.Mat) -> None:
         """
         Saves one picture of the user to the folder
+
+        Args:
+        - img: input image.
         """
         if self.__taken_pictures < 40:
             sys.stdout.write(f"Collecting pictures {self.__taken_pictures+1}/40\n")
@@ -342,6 +357,9 @@ class FaceRecognizer():
     def recognize_faces(self, img) -> None:
         """
         Performs the face recognition from the image
+
+        Args:
+        - img: input image.
         """
 
         # Leave the method if the user is being taken pictures of
@@ -350,7 +368,7 @@ class FaceRecognizer():
 
         # Leave the method if the file specified does not exist
         if not exists(self.__encodings_location):
-            sys.stdout.write("Specified file for encodings is not found\n")
+            sys.stdout.write("Error: specified file for encodings is not found\n")
             return
 
         # Loads the generated dictionary for the labels and encodings
@@ -360,7 +378,7 @@ class FaceRecognizer():
         # If the loaded file is empty - leave the method
         if len(loaded_encodings["names"]) == 0 or \
                 len(loaded_encodings["encodings"]) == 0:
-            sys.stdout.write("Empty encodings.pkl file\n")
+            sys.stdout.write("Error: empty .pkl file\n")
             return
 
         proccessed_frame = self.__preprocess_image(img)
@@ -425,6 +443,9 @@ class FaceRecognizer():
     def create_user(self, img: cv2.Mat) -> None:
         """
         Gathers pictures from the passed images and creates a new user from them
+
+        Args:
+        - img: input image.
         """
 
         # Leave the method if the user has chosen not to
