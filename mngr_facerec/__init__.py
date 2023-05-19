@@ -134,7 +134,8 @@ class FaceRecognizer():
         resized_image = cv2.resize(img,
                                     (0, 0),
                                     fx=self.__scale/10.,
-                                    fy=self.__scale/10.)
+                                    fy=self.__scale/10.,
+                                    interpolation=cv2.INTER_AREA)
         
         # Convert to black and white
         if color_space == "BGR":
