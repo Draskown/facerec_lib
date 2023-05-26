@@ -1,6 +1,7 @@
 
 # Face recognizer for the manager robot
 
+! Archived due to project's redundancy !
 Program that does face recognition in the context of applying it to the robot assistant to greet employees of Applied Robotics company
 
 ## Installation
